@@ -1,0 +1,20 @@
+{
+  "name": "ternaryop/photoshelf-util",
+  "type": "library",
+  "autoload": {
+    "psr-4": {
+      "Ternaryop\\PhotoshelfUtil\\": "src/"
+    }
+  },
+  "authors": [
+    {
+      "name": "Davide Ficano",
+      "email": "davide.ficano@gmail.com"
+    }
+  ],
+  "require": {
+    "ext-curl": "*",
+    "querypath/querypath": "^3.0",
+    "ext-mbstring": "*"
+  }
+}
