@@ -1,6 +1,8 @@
 {
   "name": "ternaryop/photoshelf-util",
   "type": "library",
+  "description": "The common code used by PhotoShelf",
+  "license": ["MIT"],
   "autoload": {
     "psr-4": {
       "Ternaryop\\PhotoshelfUtil\\": "src/"
