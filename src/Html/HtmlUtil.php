@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Ternaryop\PhotoshelfUtil\Html;
 
 use QueryPath\DOMQuery;
@@ -10,6 +13,11 @@ class HtmlUtil {
   const OPTION_USER_AGENT = 'user_agent';
   const OPTION_COOKIE = 'cookie';
 
+  /**
+   * @param string $url
+   * @param array{post_data?: object, user_agent?: string, cookie?: string}|null $options could contain (post_data, user_agent, cookie)
+   * @return string
+   */
   public static function downloadHtml(string $url, array $options = null): string {
     $result = HtmlUtil::downloadUrl($url, $options);
     if (strpos($result->getMimeType(), "text/html") === 0) {
@@ -20,7 +28,7 @@ class HtmlUtil {
 
   /**
    * @param string $url the url to download
-   * @param array|null $options could contain (post_data, user_agent, cookie)
+   * @param array{post_data?: object, user_agent?: string, cookie?: string}|null $options could contain (post_data, user_agent, cookie)
    * Return DownloadResult the result
    * @return DownloadResult
    */
@@ -106,7 +114,9 @@ class HtmlUtil {
     $path = HtmlUtil::encode_url_path($chunks['path']);
     $port = isset($chunks['port']) ? ':' . $chunks['port'] : '';
     $query = isset($chunks['query']) ? '?' . $chunks['query'] : '';
-    return $chunks['scheme'] . '://' . $chunks['host'] . $port . $path . $query;
+    $scheme = $chunks['scheme'] ?? 'http';
+    $host = $chunks['host'] ?? '';
+    return $scheme . '://' . $host . $port . $path . $query;
   }
 
   public static function encode_url_path(string $path): string {
@@ -122,11 +132,15 @@ class HtmlUtil {
     return $encode_path;
   }
 
+  /**
+   * @param string $url
+   * @return array{scheme?: string, host?: string, port?: int, user?: string, pass?: string, query?: string, path?: string, fragment?: string}
+   */
   public static function parseUrlOrThrow(string $url): array {
     if (empty($url)) {
       throw new ParseUrlException("Url is empty");
     }
-    if (strpos($url, 'http') !== 0) {
+    if (!str_starts_with($url, 'http')) {
       throw new ParseUrlException("Url found is not http");
     }
     $comp = parse_url($url);
@@ -136,11 +150,16 @@ class HtmlUtil {
     return $comp;
   }
 
-  // UTF-8 aware parse_url() replacement
-  // http://bluebones.net/2013/04/parse_url-is-not-utf-8-safe/
-  // see http://php.net/manual/en/function.parse-url.php#114817
+  /**
+   * UTF-8 aware parse_url() replacement
+   * http://bluebones.net/2013/04/parse_url-is-not-utf-8-safe/
+   * see http://php.net/manual/en/function.parse-url.php#114817
+   * @param string $url
+   * @return array{scheme?: string, host?: string, port?: int, user?: string, pass?: string, query?: string, path?: string, fragment?: string}
+   */
   public static function parse_url(string $url): array {
-    $result = false;
+    /** @var array{scheme?: string, host?: string, port?: int, user?: string, pass?: string, query?: string, path?: string, fragment?: string} $result */
+    $result = [];
 
     // Build arrays of values we need to decode before parsing
     $entities = array('%21', '%2A', '%27', '%28', '%29', '%3B', '%3A', '%40', '%26', '%3D', '%24', '%2C', '%2F', '%3F', '%23', '%5B', '%5D');
@@ -156,21 +175,30 @@ class HtmlUtil {
     // Now, decode each value of the resulting array
     if ($encodedParts) {
       foreach ($encodedParts as $key => $value) {
-        $result[$key] = urldecode(str_replace($replacements, $entities, (string)$value));
+        // port is int not string so do not convert it
+        if ($key === 'port') {
+          $result[$key] = $value;
+        } else {
+          $result[$key] = urldecode(str_replace($replacements, $entities, (string)$value));
+        }
       }
     }
     return $result;
   }
 
+  /**
+   * @param array{scheme?: string, host?: string, port?: int, user?: string, pass?: string, query?: string, path?: string, fragment?: string} $parsed_url
+   * @return string
+   */
   public static function unparse_url(array $parsed_url): string {
-    $scheme   = isset($parsed_url['scheme']) ? $parsed_url['scheme'] . '://' : '';
-    $host     = isset($parsed_url['host']) ? $parsed_url['host'] : '';
-    $port     = isset($parsed_url['port']) ? ':' . $parsed_url['port'] : '';
-    $user     = isset($parsed_url['user']) ? $parsed_url['user'] : '';
-    $pass     = isset($parsed_url['pass']) ? ':' . $parsed_url['pass'] : '';
-    $pass     = ($user || $pass) ? "$pass@" : '';
-    $path     = isset($parsed_url['path']) ? $parsed_url['path'] : '';
-    $query    = isset($parsed_url['query']) ? '?' . $parsed_url['query'] : '';
+    $scheme = isset($parsed_url['scheme']) ? $parsed_url['scheme'] . '://' : '';
+    $host = $parsed_url['host'] ?? '';
+    $port = isset($parsed_url['port']) ? ':' . $parsed_url['port'] : '';
+    $user = $parsed_url['user'] ?? '';
+    $pass = isset($parsed_url['pass']) ? ':' . $parsed_url['pass'] : '';
+    $pass = ($user || $pass) ? "$pass@" : '';
+    $path = $parsed_url['path'] ?? '';
+    $query = isset($parsed_url['query']) ? '?' . $parsed_url['query'] : '';
     $fragment = isset($parsed_url['fragment']) ? '#' . $parsed_url['fragment'] : '';
 
     return "$scheme$user$pass$host$port$path$query$fragment";
@@ -182,7 +210,7 @@ class HtmlUtil {
    */
   public static function canonicalUrl(DOMQuery $htmlDocument): ?string {
     $link = $htmlDocument->find('link[rel="canonical"]');
-    if ($link->size() == 0) {
+    if ($link->count() == 0) {
       return null;
     }
     $url = $link->attr('href');
@@ -193,7 +221,7 @@ class HtmlUtil {
   }
 
   public static function absUrl(string $baseuri, string $rel): string {
-    if (strpos($rel, "http://") === 0 || strpos($rel, "https://") === 0) {
+    if (str_starts_with($rel, "http://") || str_starts_with($rel, "https://")) {
       return $rel;
     }
     return $baseuri . "/" . $rel;
@@ -201,6 +229,8 @@ class HtmlUtil {
 
   /**
    * Return the map (width, url) for HTML srcset attribute's content sorted by width
+   * @param string $srcSet
+   * @return array<int, string>|null
    */
   public static function parseSrcSet(string $srcSet): ?array {
     if ($srcSet == null || trim($srcSet) == '') {
@@ -219,13 +249,21 @@ class HtmlUtil {
     return $map;
   }
 
+  /**
+   * @param string $originalUrl
+   * @param DOMQuery $htmlDocument
+   * @return string
+   */
   public static function resolveUrl(string $originalUrl, DOMQuery $htmlDocument): string {
     $url = HtmlUtil::canonicalUrl($htmlDocument);
     if ($url == null || $url == $originalUrl) {
       return $originalUrl;
     }
     $comp = HtmlUtil::parse_url($originalUrl);
-    $baseuri = $comp['scheme'] . "://" . $comp['host'];
+
+    $scheme = $comp['scheme'] ?? 'http';
+    $host = $comp['host'] ?? '';
+    $baseuri = $scheme . "://" . $host;
     return HtmlUtil::absUrl($baseuri, $url);
   }
 }

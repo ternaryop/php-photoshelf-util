@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Ternaryop\PhotoshelfUtil\String;
 
 class StringUtil
@@ -120,7 +122,7 @@ class StringUtil
 
     /**
      * @param string $str
-     * @return array|string|null
+     * @return array<string>|string|null
      */
     public static function normalizeWhitespaces(string $str): array|string|null
     {
